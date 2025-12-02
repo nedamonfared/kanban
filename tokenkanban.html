@@ -1,35 +1,31 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>My Jira Kanban Board</title>
-    <!-- اتصال به فایل CSS در پوشه css -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بورد کانبان شخصی</title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <h1>My Personal Kanban</h1>
 
-    <main id="kanban-board" class="kanban-board">
-        <!-- ستون‌ها و کارت‌ها بعداً توسط app.js اینجا ساخته می‌شوند -->
-        <!-- برای تست اولیه، می‌توانید چند ستون و کارت به صورت دستی اضافه کنید -->
-        <div class="kanban-column" id="todo-column">
-            <h2>To Do</h2>
-            <div class="cards-container">
-                <div class="kanban-card" draggable="true">Card 1</div>
-                <div class="kanban-card" draggable="true">Card 2</div>
-            </div>
-        </div>
-        <div class="kanban-column" id="inprogress-column">
-            <h2>In Progress</h2>
-            <div class="cards-container">
-                <div class="kanban-card" draggable="true">Card 3</div>
-            </div>
+    <header>
+        <h1>بورد کانبان شخصی</h1>
+    </header>
+
+    <main>
+        <!-- این بخش برای نمایش پیام لودینگ یا خطا استفاده می‌شود -->
+        <div id="message-container"></div>
+
+        <div id="kanban-board" class="kanban-board">
+            <!-- ستون‌ها و کارت‌ها توسط app.js در اینجا ساخته می‌شوند -->
         </div>
     </main>
 
-    <!-- اتصال به کتابخانه SortableJS -->
-    <script src="js/Sortable.min.js"></script>
+    <!-- اتصال به کتابخانه SortableJS از CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    
     <!-- اتصال به فایل جاوا اسکریپت اصلی شما -->
     <script src="js/app.js" defer></script>
+
 </body>
 </html>

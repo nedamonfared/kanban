@@ -1,4 +1,4 @@
-/* تنظیمات کلی و تم */
+/* تنظیمات کلی و تم با استفاده از متغیرها */
 :root {
     --bg-color: #f4f5f7;
     --column-bg-color: #ebecf0;
@@ -7,18 +7,11 @@
     --header-color: #0052cc;
     --border-color: #dfe1e6;
     --shadow-color: rgba(9, 30, 66, 0.25);
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        --bg-color: #1d2125;
-        --column-bg-color: #282e33;
-        --card-bg-color: #3c4248;
-        --text-color: #b6c2cf;
-        --header-color: #589dff;
-        --border-color: #4c535a;
-        --shadow-color: rgba(0, 0, 0, 0.5);
-    }
+    --error-bg-color: #ffebe6;
+    --error-border-color: #ff5630;
+    --error-text-color: #bf2600;
+    --loading-bg-color: #deebff;
+    --loading-border-color: #0052cc;
 }
 
 body {
@@ -27,36 +20,40 @@ body {
     color: var(--text-color);
     margin: 0;
     padding: 20px;
+    direction: rtl; /* راست‌چین کردن کل صفحه */
 }
 
 header h1 {
     color: var(--header-color);
     text-align: center;
+    margin-bottom: 24px;
 }
 
-/* ساختار بورد کانبان */
+/* ساختار اصلی بورد کانبان */
 #kanban-board {
     display: flex;
     gap: 16px;
-    justify-content: flex-start; /* ستون‌ها از چپ شروع شوند */
-    overflow-x: auto; /* اگر ستون‌ها زیاد شد، اسکرول افقی فعال شود */
-    padding-bottom: 20px;
+    justify-content: flex-start; /* ستون‌ها از راست شروع می‌شوند */
+    overflow-x: auto; /* اسکرول افقی در صورت نیاز */
+    padding: 10px;
+    min-height: 70vh; /* حداقل ارتفاع برای بورد */
 }
 
 /* ستون‌ها */
 .kanban-column {
     background-color: var(--column-bg-color);
-    border-radius: 3px;
+    border-radius: 6px;
     min-width: 280px;
     max-width: 280px;
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
 }
 
 .kanban-column h2 {
     font-size: 14px;
     font-weight: 600;
-    padding: 10px 12px;
+    padding: 12px 16px;
     margin: 0;
     border-bottom: 1px solid var(--border-color);
 }
@@ -64,7 +61,8 @@ header h1 {
 .cards-container {
     padding: 8px;
     flex-grow: 1;
-    overflow-y: auto; /* اسکرول داخلی برای کارت‌های زیاد */
+    overflow-y: auto;
+    min-height: 100px; /* حداقل ارتفاع برای درگ-اند-دراپ */
 }
 
 /* کارت‌ها */
@@ -72,30 +70,85 @@ header h1 {
     background-color: var(--card-bg-color);
     border-radius: 3px;
     box-shadow: 0 1px 2px var(--shadow-color);
-    padding: 8px 12px;
+    padding: 10px 12px;
     margin-bottom: 8px;
     cursor: grab;
+    text-align: right;
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.kanban-card:hover {
+    box-shadow: 0 4px 8px var(--shadow-color);
 }
 
 .kanban-card:last-child {
     margin-bottom: 0;
 }
 
-.card-header {
+.card-title {
     font-weight: bold;
     font-size: 12px;
-    color: var(--header-color);
+    color: #6b778c; /* رنگ کلید تسک */
+    margin-bottom: 6px;
 }
 
-.card-body {
+.card-summary {
     font-size: 14px;
-    padding-top: 5px;
+    margin-bottom: 10px;
 }
 
-/* استایل برای پیام لودینگ */
-#loading {
-    font-size: 18px;
+.card-footer {
+    display: flex;
+    justify-content: flex-end; /* آواتار در سمت چپ (در حالت RTL) قرار گیرد */
+    align-items: center;
+}
+
+.card-footer img {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+
+/* استایل برای پیام‌های لودینگ و خطا */
+#message-container {
+    padding: 0 10px;
+    margin-bottom: 20px;
+}
+
+.loading-message, .error-message {
+    padding: 16px;
+    border-radius: 3px;
+    border: 1px solid transparent;
     text-align: center;
-    width: 100%;
-    padding: 40px;
+}
+
+.loading-message {
+    background-color: var(--loading-bg-color);
+    border-color: var(--loading-border-color);
+}
+
+.error-message {
+    background-color: var(--error-bg-color);
+    border-color: var(--error-border-color);
+    color: var(--error-text-color);
+    text-align: right;
+}
+
+.error-message strong {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.error-message ul {
+    margin: 0;
+    padding-right: 20px;
+}
+
+/* استایل‌های کتابخانه SortableJS برای درگ-اند-دراپ */
+.sortable-ghost {
+    opacity: 0.4;
+    background-color: #cceeff;
+}
+.sortable-drag {
+    cursor: grabbing;
 }
