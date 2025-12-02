@@ -4,7 +4,7 @@
 // --- بخش ۱: تنظیمات اتصال به جیرا ---
 const JIRA_DOMAIN = "https://atlassian.crouseco.com/jira"; 
 const JIRA_EMAIL = "n.monfared@crouse.ir";
-const API_TOKEN = "lp9v5mk91582vd8n7m3iekr5j5hgeuva4ua00cu3pcicmrvpiehjkic"; 
+const API_TOKEN = "9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll"; 
 const BOARD_ID = "124"; 
 
 // --- بخش ۲: نقطه شروع برنامه ---
