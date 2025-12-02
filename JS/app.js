@@ -1,118 +1,132 @@
 // ==================== بخش تنظیمات - اینجا را با دقت پر کنید ====================
-// فایل: js/app.js
+// ==================== فایل کامل و صحیح: js/app.js ====================
 
-// ==================== بخش تنظیمات - مقادیر نهایی شما ====================
-
-// ۱. آدرس جیرا
-// آدرس دقیق سرور جیرای شما
+// --- بخش ۱: تنظیمات اتصال به جیرا ---
 const JIRA_DOMAIN = "https://atlassian.crouseco.com/jira"; 
-
-// ۲. ایمیل شما
-// ایمیلی که با آن در جیرا لاگین می‌کنید
 const JIRA_EMAIL = "n.monfared@crouse.ir";
-
-// ۳. توکن API شما
-// توکنی که از پروفایل جیرای خود ساخته‌اید و اینجا جایگزین می‌کنید
 const API_TOKEN = "lp9v5mk91582vd8n7m3iekr5j5hgeuva4ua00cu3pcicmrvpiehjkic"; 
-
-// ۴. آی‌دی برد (Board ID)
-// این عدد از URL مرورگر شما استخراج شد. کاملاً درست است.
 const BOARD_ID = "124"; 
 
-// ============================================================================
+// --- بخش ۲: نقطه شروع برنامه ---
+// این تابع زمانی اجرا می‌شود که کل صفحه HTML بارگذاری شده باشد
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("Kanban board script starting...");
+    fetchJiraData(); // فراخوانی تابع اصلی برای گرفتن داده‌ها از جیرا
+});
 
-
-// ... بقیه کد بدون تغییر باقی می‌ماند ...
-===============
-
-
-// این تابع اصلی است که همه کارها را شروع می‌کند
-async function fetchAndRenderBoard() {
-    const boardContainer = document.getElementById('kanban-board');
-    const loadingIndicator = document.getElementById('loading');
-
-    // ساختن هدر احراز هویت با استفاده از ایمیل و توکن
-    const encodedAuth = btoa(`${JIRA_EMAIL}:${API_TOKEN}`);
-    const authHeader = { 'Authorization': `Basic ${encodedAuth}`, 'Accept': 'application/json' };
-
-    // آدرس API برای گرفتن تمام تسک‌های یک برد خاص
+// --- بخش ۳: تابع اصلی برای فراخوانی API جیرا ---
+async function fetchJiraData() {
+    // ساخت URL کامل برای درخواست API
     const apiUrl = `${JIRA_DOMAIN}/rest/agile/1.0/board/${BOARD_ID}/issue?maxResults=100`;
 
+    // ساخت توکن احراز هویت (Basic Auth)
+    // فرمت لازم: base64-encoded version of "email:api_token"
+    const authToken = btoa(`${JIRA_EMAIL}:${API_TOKEN}`);
+
+    console.log(`Sending request to Jira API: ${apiUrl}`);
+
     try {
-        // ارسال درخواست به جیرا
-        console.log("Sending request to Jira API...");
         const response = await fetch(apiUrl, {
             method: 'GET',
-            headers: authHeader
+            headers: {
+                'Authorization': `Basic ${authToken}`,
+                'Accept': 'application/json'
+            }
         });
 
-        // اگر پاسخ موفقیت‌آمیز نبود (مثلا خطای 401 یا 404)
+        // اگر درخواست ناموفق بود (مثلا خطای 401 یا 404)
         if (!response.ok) {
-            throw new Error(`Jira API request failed: ${response.status} ${response.statusText}`);
+            throw new Error(`Error fetching data: ${response.status} ${response.statusText}`);
         }
 
-        // تبدیل پاسخ به فرمت JSON
         const data = await response.json();
         console.log("Successfully fetched data:", data);
 
-        // مخفی کردن پیام لودینگ
-        loadingIndicator.style.display = 'none';
-        
-        // ارسال داده‌ها به تابع renderBoard برای نمایش در صفحه
+        // حالا که داده‌ها را داریم، آن‌ها را در صفحه نمایش می‌دهیم
         renderBoard(data.issues);
 
     } catch (error) {
-        // در صورت بروز هرگونه خطا، آن را در کنسول و صفحه نمایش بده
-        console.error("Error connecting to Jira:", error);
-        loadingIndicator.textContent = `Error: Could not connect to Jira. Check console (F12) for details. (Most likely a CORS or Auth error)`;
-        loadingIndicator.style.color = 'red';
+        console.error("Failed to connect to Jira API:", error);
+        // نمایش یک پیام خطا در صفحه
+        const boardContainer = document.getElementById('kanban-board');
+        boardContainer.innerHTML = `<div class="error-message">
+            <h2>خطا در اتصال به جیرا</h2>
+            <p>لطفاً موارد زیر را بررسی کنید:</p>
+            <ul>
+                <li>آیا به اینترنت یا شبکه داخلی شرکت متصل هستید؟</li>
+                <li>آیا توکن API شما صحیح و معتبر است؟</li>
+                <li>آیا ادمین جیرا دامنه GitHub Pages شما را در CORS Whitelist ثبت کرده است؟</li>
+            </ul>
+            <p>جزئیات خطا در کنسول مرورگر (F12) قابل مشاهده است.</p>
+        </div>`;
     }
 }
 
-// این تابع داده‌ها را می‌گیرد و ساختار HTML بورد را می‌سازد
+// --- بخش ۴: تابع برای ساخت کارت‌ها و ستون‌ها در HTML ---
 function renderBoard(issues) {
     const boardContainer = document.getElementById('kanban-board');
-    boardContainer.innerHTML = ''; // پاک کردن محتوای قبلی (پیام لودینگ)
+    boardContainer.innerHTML = ''; // اول صفحه را خالی کن
 
-    // دسته‌بندی تسک‌ها بر اساس وضعیت (Status) آنها
-    const columns = issues.reduce((acc, issue) => {
+    // گروه‌بندی تسک‌ها بر اساس وضعیت (status)
+    const columns = {};
+    issues.forEach(issue => {
         const statusName = issue.fields.status.name;
-        if (!acc[statusName]) {
-            acc[statusName] = []; // اگر ستون برای این وضعیت وجود نداشت، بساز
+        if (!columns[statusName]) {
+            columns[statusName] = [];
         }
-        acc[statusName].push(issue); // تسک را به ستون مربوطه اضافه کن
-        return acc;
-    }, {});
+        columns[statusName].push(issue);
+    });
 
-    // ساختن HTML برای هر ستون و کارت‌های داخل آن
-    for (const columnName in columns) {
-        const columnDiv = document.createElement('div');
-        columnDiv.className = 'kanban-column';
-        
-        const columnTitle = document.createElement('h2');
-        columnTitle.textContent = columnName;
-        
-        const cardsContainer = document.createElement('div');
-        cardsContainer.className = 'cards-container';
-        
-        columns[columnName].forEach(issue => {
-            const cardDiv = document.createElement('div');
-            cardDiv.className = 'kanban-card';
-            cardDiv.dataset.issueKey = issue.key; // ذخیره کردن کلید تسک برای آینده
-            
-            // ساختن محتوای کارت
-            cardDiv.innerHTML = `
-                <div class="card-header">${issue.key}</div>
-                <div class="card-body">${issue.fields.summary}</div>
+    console.log("Columns grouped by status:", columns);
+
+    // ساخت ستون‌ها و کارت‌ها در HTML
+    for (const statusName in columns) {
+        // ساخت ستون
+        const columnEl = document.createElement('div');
+        columnEl.className = 'kanban-column';
+        columnEl.innerHTML = `<h2>${statusName}</h2>`;
+
+        // ساخت محفظه کارت‌ها
+        const cardsContainerEl = document.createElement('div');
+        cardsContainerEl.className = 'cards-container';
+        cardsContainerEl.setAttribute('data-status-id', statusName); // برای استفاده در آینده
+
+        // ساخت هر کارت در ستون
+        columns[statusName].forEach(issue => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'kanban-card';
+            cardEl.setAttribute('data-issue-id', issue.id); // ذخیره ID تسک
+            cardEl.innerHTML = `
+                <div class="card-title">${issue.key}</div>
+                <div class="card-summary">${issue.fields.summary}</div>
+                <div class="card-footer">
+                    <img src="${issue.fields.assignee ? issue.fields.assignee.avatarUrls['24x24'] : 'placeholder.png'}" alt="Assignee">
+                </div>
             `;
-            cardsContainer.appendChild(cardDiv);
+            cardsContainerEl.appendChild(cardEl);
         });
 
-        columnDiv.appendChild(columnTitle);
-        columnDiv.appendChild(cardsContainer);
-        boardContainer.appendChild(columnDiv);
+        columnEl.appendChild(cardsContainerEl);
+        boardContainer.appendChild(columnEl);
     }
+    
+    // بعد از اینکه تمام ستون‌ها و کارت‌ها ساخته شد، قابلیت Drag & Drop را فعال کن
+    initSortable();
 }
 
-// بعد از اینکه کل ساختار HTML صفحه لود شد، تابع اصلی را اجرا کن
-document.addEventListener('DOMContentLoaded', fetchAndRenderBoard);
+
+// --- بخش ۵: تابع برای فعال‌سازی Drag & Drop ---
+function initSortable() {
+    const containers = document.querySelectorAll('.cards-container');
+    
+    containers.forEach(container => {
+        new Sortable(container, {
+            group: 'kanban', // این باعث می‌شود بتوان کارت‌ها را بین ستون‌ها جابجا کرد
+            animation: 150,
+            ghostClass: 'sortable-ghost', // کلاس برای آیتم "شبح"
+            dragClass: 'sortable-drag'   // کلاس برای آیتم در حال کشیده شدن
+        });
+    });
+
+    console.log("SortableJS initialized on all columns.");
+}
