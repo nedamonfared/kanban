@@ -1,139 +1,138 @@
 //const API_TOKEN = "9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll"; //
 document.addEventListener('DOMContentLoaded', () => {
-    
     // --- تنظیمات اصلی ---
-    // لطفاً فقط توکن خود را در این قسمت جایگذاری کنید
-    
-    const JIRA_DOMAIN = "https://atlassian.crouseco.com/jira";
-    const USER_EMAIL = "n.monfared@crouse.ir";
-    const API_TOKEN = "9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll"; 
-    const BOARD_ID = "124";
-    
-    // !!!!!!!!!!!! هشدار امنیتی !!!!!!!!!!!!
-    // توکن API جدید خود را در اینجا قرار دهید. این توکن مانند رمز عبور شماست.
-    // آن را با هیچکس به اشتراک نگذارید و در کدهای عمومی آپلود نکنید.
-    const kanbanBoard = document.getElementById('kanban-board');
-    const messageContainer = document.getElementById('message-container');
+    // لطفاً این مقادیر را با اطلاعات واقعی خود جایگزین کنید
+    const JIRA_DOMAIN = 'https://atlassian.crouseco.com/jira';
+    const JIRA_EMAIL = 'n.monfared@crouse.ir';
+    const API_TOKEN = '9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll'; // !!! مهم: توکن API خود را اینجا قرار دهید
+    const BOARD_ID = '124'; // شناسه بورد شما
 
-    // تابع برای نمایش پیام (لودینگ یا خطا)
-    function showMessage(type, title, details = []) {
-        let detailsHtml = '';
-        if (details.length > 0) {
-            detailsHtml = '<ul>' + details.map(d => `<li>${d}</li>`).join('') + '</ul>';
-        }
-        messageContainer.innerHTML = `
-            <div class="${type}-message">
-                <strong>${title}</strong>
-                ${detailsHtml}
-            </div>
-        `;
+    // --- ستون‌های کانبان ---
+    // نام ستون‌ها باید دقیقاً با نام وضعیت‌ها در جیرا مطابقت داشته باشد
+    const COLUMNS = {
+        'To Do': [],
+        'In Progress': [],
+        'Done': []
+        // در صورت نیاز ستون‌های بیشتری اضافه کنید
+        // 'نام ستون در جیرا': []
+    };
+
+    const messageContainer = document.getElementById('message-container');
+    const kanbanBoard = document.getElementById('kanban-board');
+
+    // تابع برای نمایش پیام
+    function showMessage(text, type = 'error') {
+        messageContainer.innerHTML = `<div class="${type}-message">${text}</div>`;
+        kanbanBoard.innerHTML = ''; // بورد را پاک کن
     }
 
-    // تابع اصلی برای دریافت و نمایش تسک‌ها
+    // تابع اصلی برای دریافت اطلاعات و ساخت بورد
     async function fetchAndRenderBoard() {
-        showMessage('loading', 'در حال بارگذاری تسک‌ها از جیرا...');
-        
-        // ساخت هدر Authorization برای ارسال به API جیرا
-        const headers = new Headers();
-        headers.append("Authorization", "Basic " + btoa(USER_EMAIL + ":" + API_TOKEN));
-        headers.append("Accept", "application/json");
+        showMessage('در حال بارگذاری تسک‌ها از جیرا...', 'loading');
 
-        // URL نهایی برای دریافت issue های بورد
+        // ساخت هدر Authorization برای Basic Auth
+        const headers = new Headers();
+        headers.append('Authorization', 'Basic ' + btoa(JIRA_EMAIL + ':' + API_TOKEN));
+        headers.append('Content-Type', 'application/json');
+        headers.append('Accept', 'application/json');
+
+        // URL جدید و ساده‌تر برای دریافت تمام تسک‌های یک بورد Kanban
         const apiUrl = `${JIRA_DOMAIN}/rest/agile/1.0/board/${BOARD_ID}/issue?maxResults=100`;
 
         try {
             const response = await fetch(apiUrl, { method: 'GET', headers: headers });
 
             if (!response.ok) {
-                // مدیریت خطاهای HTTP
-                const errorData = await response.json().catch(() => null);
-                const errorMessages = errorData ? errorData.errorMessages : ['پاسخی از سرور دریافت نشد.'];
-                throw new Error(`خطای ${response.status}: ${errorMessages.join(', ')}`);
+                // اگر پاسخ موفقیت‌آمیز نبود، خطا را بر اساس کد وضعیت نمایش بده
+                if (response.status === 401) {
+                    throw new Error('خطای احراز هویت (401). آیا ایمیل و توکن API صحیح هستند؟');
+                } else if (response.status === 404) {
+                    throw new Error('بورد پیدا نشد (404). آیا شناسه بورد (Board ID) صحیح است؟');
+                } else {
+                    throw new Error(`خطای سرور: ${response.status} ${response.statusText}`);
+                }
             }
 
             const data = await response.json();
-            messageContainer.innerHTML = ''; // پاک کردن پیام لودینگ
-            renderBoard(data.issues);
+            const issues = data.issues;
+
+            if (!issues || issues.length === 0) {
+                showMessage('هیچ تسکی روی این بورد یافت نشد.', 'info');
+                return;
+            }
+
+            // دسته‌بندی تسک‌ها در ستون‌های تعریف شده
+            issues.forEach(issue => {
+                const status = issue.fields.status.name;
+                if (COLUMNS.hasOwnProperty(status)) {
+                    COLUMNS[status].push(issue);
+                }
+            });
+
+            renderBoard();
 
         } catch (error) {
             console.error('خطا در ارتباط با API جیرا:', error);
-            showMessage('error', 'مشکلی در دریافت اطلاعات پیش آمد!', [
-                `متن خطا: ${error.message}`,
-                'لطفاً موارد زیر را بررسی کنید:',
-                '۱. آیا توکن API شما صحیح و معتبر است؟',
-                '۲. آیا آدرس دامنه جیرا و شناسه بورد (Board ID) درست است؟',
-                '۳. آیا به اینترنت یا شبکه داخلی شرکت متصل هستید؟'
-            ]);
+            const errorMessage = `
+                <strong>مشکلی در دریافت اطلاعات پیش آمد!</strong><br>
+                خطای اصلی: ${error.message}<br>
+                لطفاً موارد زیر را بررسی کنید:
+                <ul>
+                    <li>آیا توکن API شما صحیح و معتبر است؟</li>
+                    <li>آیا آدرس دامنه جیرا و شناسه بورد (Board ID) درست است؟</li>
+                    <li>آیا Whitelist در جیرا برای آدرس <strong>https://nedamonfared.github.io</strong> به درستی تنظیم شده است؟ (مهم‌ترین دلیل خطای Failed to fetch)</li>
+                </ul>
+            `;
+            showMessage(errorMessage, 'error');
         }
     }
 
-    // تابع برای ساخت ستون‌ها و کارت‌ها در صفحه
-    function renderBoard(issues) {
-        kanbanBoard.innerHTML = ''; // پاک کردن محتوای قبلی بورد
-        const columns = {};
+    // تابع برای ساخت HTML بورد
+    function renderBoard() {
+        kanbanBoard.innerHTML = ''; // پاک کردن محتوای قبلی
+        messageContainer.innerHTML = ''; // پاک کردن پیام‌ها
 
-        // گروه‌بندی تسک‌ها بر اساس وضعیت (status)
-        issues.forEach(issue => {
-            const statusName = issue.fields.status.name;
-            if (!columns[statusName]) {
-                columns[statusName] = [];
-            }
-            columns[statusName].push(issue);
-        });
-
-        // ایجاد ستون‌ها در HTML
-        for (const columnName in columns) {
+        for (const columnName in COLUMNS) {
             const columnEl = document.createElement('div');
             columnEl.className = 'kanban-column';
-            columnEl.innerHTML = `<h2>${columnName} (${columns[columnName].length})</h2>`;
-            
+
+            const titleEl = document.createElement('h3');
+            titleEl.textContent = columnName;
+            columnEl.appendChild(titleEl);
+
             const cardsContainer = document.createElement('div');
             cardsContainer.className = 'cards-container';
-            cardsContainer.dataset.columnName = columnName; // برای شناسایی ستون
-            
-            // ایجاد کارت‌ها برای هر تسک در ستون
-            columns[columnName].forEach(issue => {
-                const card = createTaskCard(issue);
+            cardsContainer.id = `column-${columnName.replace(/\s+/g, '-')}`; // ساخت ID منحصر به فرد
+
+            COLUMNS[columnName].forEach(issue => {
+                const card = document.createElement('div');
+                card.className = 'kanban-card';
+                card.dataset.issueId = issue.id;
+                card.innerHTML = `
+                    <div class="card-title">${issue.fields.summary}</div>
+                    <div class="card-meta">
+                        <span>${issue.key}</span>
+                        ${issue.fields.assignee ? `<span class="assignee">${issue.fields.assignee.displayName}</span>` : ''}
+                    </div>
+                `;
                 cardsContainer.appendChild(card);
             });
-            
+
             columnEl.appendChild(cardsContainer);
             kanbanBoard.appendChild(columnEl);
-        }
 
-        // فعال‌سازی قابلیت درگ-اند-دراپ برای تمام ستون‌ها
-        enableDragAndDrop();
-    }
-
-    // تابع برای ساخت یک کارت تسک
-    function createTaskCard(issue) {
-        const card = document.createElement('div');
-        card.className = 'kanban-card';
-        card.dataset.issueId = issue.id;
-
-        const assigneeAvatar = issue.fields.assignee ? issue.fields.assignee.avatarUrls['48x48'] : '';
-
-        card.innerHTML = `
-            <div class="card-title">${issue.key}</div>
-            <div class="card-summary">${issue.fields.summary}</div>
-            ${assigneeAvatar ? `<div class="card-footer"><img src="${assigneeAvatar}" alt="Assignee"></div>` : ''}
-        `;
-        return card;
-    }
-    
-    // تابع برای فعال‌سازی درگ-اند-دراپ با SortableJS
-    function enableDragAndDrop() {
-        const cardContainers = document.querySelectorAll('.cards-container');
-        cardContainers.forEach(container => {
-            new Sortable(container, {
-                group: 'kanban', // نام گروه مشترک برای امکان جابجایی بین ستون‌ها
-                animation: 150,
-                ghostClass: 'sortable-ghost',
-                dragClass: 'sortable-drag',
+            // فعال‌سازی SortableJS برای هر ستون
+            new Sortable(cardsContainer, {
+                group: 'kanban', // اجازه جابجایی کارت‌ها بین ستون‌ها
+                animation: 150
             });
-        });
+        }
     }
 
-    // اجرای برنامه
-    fetchAndRenderBoard();
+    // شروع عملیات
+    if (API_TOKEN === 'YOUR_API_TOKEN_HERE') {
+        showMessage('توکن API در فایل app.js وارد نشده است! لطفاً فایل را ویرایش کرده و توکن خود را جایگذاری کنید.', 'error');
+    } else {
+        fetchAndRenderBoard();
+    }
 });
