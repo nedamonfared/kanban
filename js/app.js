@@ -1,20 +1,17 @@
-//const API_TOKEN = "9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll"; //
 document.addEventListener('DOMContentLoaded', () => {
     // --- تنظیمات اصلی ---
-    // لطفاً این مقادیر را با اطلاعات واقعی خود جایگزین کنید
+    // آدرس دامنه جیرا و توکن API خود را اینجا قرار دهید
     const JIRA_DOMAIN = 'https://atlassian.crouseco.com/jira';
-    const JIRA_EMAIL = 'n.monfared@crouse.ir';
-    const API_TOKEN = '9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll'; // !!! مهم: توکن API خود را اینجا قرار دهید
-    const BOARD_ID = '124'; // شناسه بورد شما
+    const API_TOKEN = '9ktoj744epmq5p880jneoo7rict4ehhsbe4c0mf8ic92fvr9e0ll'; // توکن شما
 
     // --- ستون‌های کانبان ---
-    // نام ستون‌ها باید دقیقاً با نام وضعیت‌ها در جیرا مطابقت داشته باشد
+    // نام ستون‌ها باید با مقداری که در کوئری SQL برای statusName برمی‌گردد، مطابقت داشته باشد
+    // شما می‌توانید ستون‌های بیشتری بر اساس وضعیت‌های موجود در پروژه‌تان اضافه کنید
     const COLUMNS = {
         'To Do': [],
         'In Progress': [],
+        'In Review': [], // مثال: یک ستون جدید
         'Done': []
-        // در صورت نیاز ستون‌های بیشتری اضافه کنید
-        // 'نام ستون در جیرا': []
     };
 
     const messageContainer = document.getElementById('message-container');
@@ -26,71 +23,78 @@ document.addEventListener('DOMContentLoaded', () => {
         kanbanBoard.innerHTML = ''; // بورد را پاک کن
     }
 
-    // تابع اصلی برای دریافت اطلاعات و ساخت بورد
+    // تابع اصلی برای دریافت اطلاعات از API سفارشی شما
     async function fetchAndRenderBoard() {
-        showMessage('در حال بارگذاری تسک‌ها از جیرا...', 'loading');
+        showMessage('در حال بارگذاری تسک‌ها از API سفارشی...', 'loading');
 
-        // ساخت هدر Authorization برای Basic Auth
+        // --- تغییر کلیدی ۱: ساخت هدر با Bearer Token ---
+        // ScriptRunner از Bearer Token استفاده می‌کند، نه Basic Auth
         const headers = new Headers();
-        headers.append('Authorization', 'Basic ' + btoa(JIRA_EMAIL + ':' + API_TOKEN));
+        headers.append('Authorization', 'Bearer ' + API_TOKEN);
         headers.append('Content-Type', 'application/json');
-        headers.append('Accept', 'application/json');
 
-        // URL جدید و ساده‌تر برای دریافت تمام تسک‌های یک بورد Kanban
-        const apiUrl = `${JIRA_DOMAIN}/rest/agile/1.0/board/${BOARD_ID}/issue?maxResults=100`;
+        // --- تغییر کلیدی ۲: آدرس API سفارشی شما ---
+        // دیگر نیازی به Board ID نیست، مستقیم به اندپوینتی که ساختید متصل می‌شویم
+        const apiUrl = `${JIRA_DOMAIN}/rest/scriptrunner/latest/custom/getDataAnalizeIssues`;
 
         try {
             const response = await fetch(apiUrl, { method: 'GET', headers: headers });
 
             if (!response.ok) {
-                // اگر پاسخ موفقیت‌آمیز نبود، خطا را بر اساس کد وضعیت نمایش بده
+                // خطاهای رایج برای API سفارشی
                 if (response.status === 401) {
-                    throw new Error('خطای احراز هویت (401). آیا ایمیل و توکن API صحیح هستند؟');
-                } else if (response.status === 404) {
-                    throw new Error('بورد پیدا نشد (404). آیا شناسه بورد (Board ID) صحیح است؟');
+                    throw new Error('خطای احراز هویت (401). آیا توکن API صحیح و معتبر است؟');
+                } else if (response.status === 403) {
+                     throw new Error('خطای دسترسی (403). آیا کاربری که توکن به او تعلق دارد، دسترسی به اجرای اسکریپت را دارد؟');
                 } else {
-                    throw new Error(`خطای سرور: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text(); // دریافت متن خطا از ScriptRunner
+                    throw new Error(`خطای سرور: ${response.status}. پیام: ${errorText}`);
                 }
             }
 
-            const data = await response.json();
-            const issues = data.issues;
+            // --- تغییر کلیدی ۳: پردازش پاسخ جدید ---
+            // API شما مستقیماً یک آرایه از تسک‌ها را برمی‌گرداند (نه یک آبجکت شامل issues)
+            const issues = await response.json();
 
             if (!issues || issues.length === 0) {
-                showMessage('هیچ تسکی روی این بورد یافت نشد.', 'info');
+                showMessage('هیچ تسکی از API دریافت نشد.', 'info');
                 return;
             }
 
-            // دسته‌بندی تسک‌ها در ستون‌های تعریف شده
+            // دسته‌بندی تسک‌ها بر اساس فیلد statusName از API شما
             issues.forEach(issue => {
-                const status = issue.fields.status.name;
+                // نام فیلد statusName دقیقاً همان چیزی است که در کوئری SQL تعریف کردید
+                const status = issue.statusName; 
                 if (COLUMNS.hasOwnProperty(status)) {
                     COLUMNS[status].push(issue);
+                } else {
+                    // اگر وضعیتی وجود داشت که در COLUMNS تعریف نشده، آن را نادیده می‌گیریم یا لاگ می‌زنیم
+                    console.warn(`وضعیت "${status}" در لیست ستون‌ها تعریف نشده است.`);
                 }
             });
 
             renderBoard();
 
         } catch (error) {
-            console.error('خطا در ارتباط با API جیرا:', error);
+            console.error('خطا در ارتباط با API سفارشی جیرا:', error);
             const errorMessage = `
-                <strong>مشکلی در دریافت اطلاعات پیش آمد!</strong><br>
+                <strong>مشکلی در دریافت اطلاعات از ScriptRunner API پیش آمد!</strong><br>
                 خطای اصلی: ${error.message}<br>
                 لطفاً موارد زیر را بررسی کنید:
                 <ul>
-                    <li>آیا توکن API شما صحیح و معتبر است؟</li>
-                    <li>آیا آدرس دامنه جیرا و شناسه بورد (Board ID) درست است؟</li>
-                    <li>آیا Whitelist در جیرا برای آدرس <strong>https://nedamonfared.github.io</strong> به درستی تنظیم شده است؟ (مهم‌ترین دلیل خطای Failed to fetch)</li>
+                    <li>آیا توکن API صحیح و فعال است؟</li>
+                    <li>آیا آدرس API سفارشی (` + apiUrl + `) صحیح است؟</li>
+                    <li>آیا مشکلی در اجرای اسکریپت Groovy در سمت سرور وجود دارد (می‌توانید لاگ‌های جیرا را بررسی کنید)؟</li>
                 </ul>
             `;
             showMessage(errorMessage, 'error');
         }
     }
 
-    // تابع برای ساخت HTML بورد
+    // تابع برای ساخت HTML بورد با داده‌های جدید
     function renderBoard() {
-        kanbanBoard.innerHTML = ''; // پاک کردن محتوای قبلی
-        messageContainer.innerHTML = ''; // پاک کردن پیام‌ها
+        kanbanBoard.innerHTML = '';
+        messageContainer.innerHTML = '';
 
         for (const columnName in COLUMNS) {
             const columnEl = document.createElement('div');
@@ -102,17 +106,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const cardsContainer = document.createElement('div');
             cardsContainer.className = 'cards-container';
-            cardsContainer.id = `column-${columnName.replace(/\s+/g, '-')}`; // ساخت ID منحصر به فرد
+            cardsContainer.id = `column-${columnName.replace(/\s+/g, '-')}`;
 
+            // --- تغییر کلیدی ۴: استفاده از نام فیلدهای جدید در ساخت کارت ---
             COLUMNS[columnName].forEach(issue => {
                 const card = document.createElement('div');
                 card.className = 'kanban-card';
-                card.dataset.issueId = issue.id;
+                card.dataset.issueId = issue.issueId; // از issueId که در SQL تعریف کردید استفاده می‌کنیم
+
+                // از issueSummary، issueKey و assignee که در خروجی API شما هستند استفاده می‌کنیم
                 card.innerHTML = `
-                    <div class="card-title">${issue.fields.summary}</div>
+                    <div class="card-title">${issue.issueSummary}</div>
                     <div class="card-meta">
-                        <span>${issue.key}</span>
-                        ${issue.fields.assignee ? `<span class="assignee">${issue.fields.assignee.displayName}</span>` : ''}
+                        <span>${issue.issueKey}</span>
+                        ${issue.assignee ? `<span class="assignee">${issue.assignee}</span>` : '<span class="unassigned">Unassigned</span>'}
                     </div>
                 `;
                 cardsContainer.appendChild(card);
@@ -121,17 +128,17 @@ document.addEventListener('DOMContentLoaded', () => {
             columnEl.appendChild(cardsContainer);
             kanbanBoard.appendChild(columnEl);
 
-            // فعال‌سازی SortableJS برای هر ستون
+            // فعال‌سازی SortableJS برای Drag and Drop
             new Sortable(cardsContainer, {
-                group: 'kanban', // اجازه جابجایی کارت‌ها بین ستون‌ها
+                group: 'kanban',
                 animation: 150
             });
         }
     }
 
     // شروع عملیات
-    if (API_TOKEN === 'YOUR_API_TOKEN_HERE') {
-        showMessage('توکن API در فایل app.js وارد نشده است! لطفاً فایل را ویرایش کرده و توکن خود را جایگذاری کنید.', 'error');
+    if (!API_TOKEN || API_TOKEN === 'YOUR_API_TOKEN_HERE') {
+        showMessage('توکن API در فایل app.js وارد نشده است!', 'error');
     } else {
         fetchAndRenderBoard();
     }
